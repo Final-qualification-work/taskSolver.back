@@ -3,6 +3,8 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const specs = require('./src/config/swagger');
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -21,8 +23,16 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// Логирование запросов (для отладки)
+// Swagger документация
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Task Management API Documentation'
+}));
+
+// Логирование запросов
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
@@ -32,12 +42,13 @@ app.use((req, res, next) => {
 app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 
-// Базовый роут для проверки
+// Базовый роут
 app.get('/', (req, res) => {
     res.json({ 
         message: 'API системы управления задачами работает',
         version: '1.0.0',
-        database: 'SQLite'
+        database: 'SQLite',
+        documentation: '/api-docs'
     });
 });
 
@@ -64,18 +75,14 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
     try {
-        // Проверяем подключение к БД
         await testConnection();
-        
-        // Синхронизируем модели с БД
-        // Внимание: { force: true } пересоздаст таблицы при каждом запуске!
-        // Для продакшена используйте { force: false } или { alter: true }
         await syncDatabase(false);
         
         app.listen(PORT, () => {
-            console.log(`Сервер запущен на порту ${PORT}`);
+            console.log(`\nСервер запущен на порту ${PORT}`);
             console.log(`База данных SQLite: ${process.env.DB_STORAGE}`);
-            console.log(`Режим: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Документация Swagger: http://localhost:${PORT}/api-docs`);
+            console.log(`Режим: ${process.env.NODE_ENV || 'development'}\n`);
         });
     } catch (error) {
         console.error('Ошибка запуска сервера:', error);

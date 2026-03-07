@@ -73,11 +73,11 @@ module.exports = (sequelize) => {
                     msg: 'Приоритет должен быть не менее 1'
                 },
                 max: {
-                    args: [10],
-                    msg: 'Приоритет должен быть не более 10'
+                    args: [3],
+                    msg: 'Приоритет должен быть не более 3'
                 }
             },
-            comment: 'Приоритет для бизнеса (1-10)'
+            comment: 'Приоритет для бизнеса (1-3)'
         },
         status: {
             type: DataTypes.ENUM('not groomed', 'backlog', 'todo', 'in progress', 'done'),
