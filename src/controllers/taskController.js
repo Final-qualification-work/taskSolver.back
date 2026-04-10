@@ -158,9 +158,9 @@ exports.deleteTask = async (req, res) => {
 };
 
 // Алгоритм распределения задач
-exports.optimizeAssignment = async (req, res) => {
-    const transaction = await require('../config/database').sequelize.transaction();
-    
+// @desc    Оптимизация распределения задач
+// @route   GET /api/tasks/optimize
+const optimizeAssignment = async (req, res) => {
     try {
         // Получаем все невыполненные задачи
         const tasks = await Task.findAll({
@@ -168,81 +168,164 @@ exports.optimizeAssignment = async (req, res) => {
                 status: {
                     [Op.ne]: 'done'
                 }
-            },
-            transaction
-        });
-        
-        // Получаем все команды
-        const teams = await Team.findAll({ transaction });
-        
-        // Создаем объект для отслеживания загрузки команд
-        const teamLoads = {};
-        teams.forEach(team => {
-            teamLoads[team.id] = team.currentLoad || 0;
-        });
-        
-        // Сортируем задачи по приоритету (business_priority * complexity)
-        const sortedTasks = tasks.sort((a, b) => {
-            const priorityA = a.business_priority * a.complexity;
-            const priorityB = b.business_priority * b.complexity;
-            return priorityB - priorityA;
-        });
-        
-        const assignments = [];
-        
-        for (const task of sortedTasks) {
-            // Ищем подходящие команды по тегу и доступной вместимости
-            const availableTeams = teams.filter(team => 
-                team.tag === task.tag && 
-                teamLoads[team.id] + task.complexity <= team.capacity
-            );
-            
-            if (availableTeams.length > 0) {
-                // Выбираем команду с наименьшей загрузкой
-                const selectedTeam = availableTeams.reduce((min, team) => 
-                    teamLoads[team.id] < teamLoads[min.id] ? team : min
-                );
-                
-                assignments.push({
-                    taskId: task.id,
-                    taskName: task.name,
-                    teamId: selectedTeam.id,
-                    teamName: selectedTeam.name,
-                    complexity: task.complexity,
-                    cost: task.complexity * selectedTeam.cost
-                });
-                
-                // Обновляем загрузку
-                teamLoads[selectedTeam.id] += task.complexity;
-                
-                // Обновляем задачу в БД
-                await task.update({
-                    assignedTeamId: selectedTeam.id,
-                    status: 'in progress'
-                }, { transaction });
-                
-                // Обновляем загрузку команды
-                await selectedTeam.update({
-                    currentLoad: teamLoads[selectedTeam.id]
-                }, { transaction });
             }
+        });
+
+        // Получаем все команды
+        const teams = await Team.findAll();
+
+        if (teams.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Нет доступных команд для распределения'
+            });
+        }
+
+        if (tasks.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Нет задач для распределения'
+            });
+        }
+
+        // Импортируем оптимизатор
+        const SimplexOptimizer = require('../utils/simplexOptimizer');
+        
+        // Создаем экземпляр оптимизатора
+        const optimizer = new SimplexOptimizer(tasks, teams);
+        
+        // Запускаем оптимизацию
+        const solutions = await optimizer.optimize();
+        
+        if (solutions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Не найдено допустимых решений (невозможно назначить все задачи)'
+            });
         }
         
-        await transaction.commit();
+        // Сохраняем лучшее решение (компромиссное)
+        const bestSolution = solutions[Math.floor(solutions.length / 2)];
+        await optimizer.saveBestSolution(bestSolution);
         
+        // Форматируем результат
+        const formattedResults = solutions.map((solution, idx) => {
+            // Таблица назначений в удобном формате
+            const assignmentTable = {
+                teams: solution.assignmentTable.headers.teams,
+                tasks: solution.assignmentTable.headers.tasks,
+                matrix: solution.assignmentTable.matrix,
+                details: solution.assignmentTable.rows.map(row => ({
+                    team: row.teamName,
+                    assignedTasks: row.assignments.filter(a => a.assigned).map(a => a.taskName)
+                }))
+            };
+            
+            return {
+                point: String.fromCharCode(65 + idx),
+                name: solution.name,
+                weights: {
+                    alpha: solution.weights.alpha,
+                    beta: solution.weights.beta,
+                    gamma: solution.weights.gamma
+                },
+                metrics: {
+                    totalCost: solution.totalCost.toFixed(2),
+                    maxLoad: (solution.maxLoad * 100).toFixed(1),
+                    maxLoadValue: solution.maxLoad.toFixed(3),
+                    totalPreference: solution.totalPreference.toFixed(1)
+                },
+                assignmentTable: assignmentTable,
+                assignments: solution.assignments.map(a => ({
+                    taskName: a.taskName,
+                    teamName: a.teamName,
+                    complexity: a.complexity,
+                    cost: a.cost
+                })),
+                teamLoads: Object.entries(solution.teamLoads).map(([teamId, load]) => {
+                    const team = teams.find(t => t.id == teamId);
+                    return {
+                        teamName: team ? team.name : 'Unknown',
+                        load: load,
+                        capacity: team ? team.capacity : 0,
+                        percentage: team ? ((load / team.capacity) * 100).toFixed(1) : 0
+                    };
+                })
+            };
+        });
+
         res.status(200).json({
             success: true,
-            data: assignments,
-            message: 'Распределение выполнено успешно'
+            data: {
+                summary: {
+                    totalTeams: teams.length,
+                    totalTasks: tasks.length,
+                    solutionsCount: solutions.length,
+                    bestSolution: formattedResults[Math.floor(formattedResults.length / 2)]
+                },
+                paretoFront: formattedResults
+            },
+            message: 'Оптимизация выполнена успешно. Все задачи назначены, каждая команда получила минимум одну задачу.'
         });
     } catch (error) {
-        await transaction.rollback();
+        console.error('Ошибка при оптимизации:', error);
         res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message || 'Ошибка при выполнении оптимизации'
         });
     }
 };
+
+// Функция генерации рекомендаций
+function generateRecommendations(paretoSolutions) {
+    if (paretoSolutions.length === 0) return [];
+    
+    const recommendations = [];
+    
+    // Рекомендация для минимальной стоимости
+    const minCost = paretoSolutions[0];
+    recommendations.push({
+        scenario: 'Минимизация стоимости',
+        weights: minCost.weights,
+        expectedCost: minCost.totalCost,
+        expectedLoad: (minCost.maxLoad * 100).toFixed(1) + '%',
+        expectedPreference: minCost.totalPreference.toFixed(1)
+    });
+    
+    // Рекомендация для сбалансированного решения
+    const balancedIndex = Math.floor(paretoSolutions.length / 2);
+    const balanced = paretoSolutions[balancedIndex];
+    recommendations.push({
+        scenario: 'Сбалансированное решение',
+        weights: balanced.weights,
+        expectedCost: balanced.totalCost,
+        expectedLoad: (balanced.maxLoad * 100).toFixed(1) + '%',
+        expectedPreference: balanced.totalPreference.toFixed(1)
+    });
+    
+    // Рекомендация для минимальной загрузки
+    const minLoad = paretoSolutions.reduce((min, s) => 
+        s.maxLoad < min.maxLoad ? s : min, paretoSolutions[0]);
+    recommendations.push({
+        scenario: 'Минимизация загрузки',
+        weights: minLoad.weights,
+        expectedCost: minLoad.totalCost,
+        expectedLoad: (minLoad.maxLoad * 100).toFixed(1) + '%',
+        expectedPreference: minLoad.totalPreference.toFixed(1)
+    });
+    
+    // Рекомендация для максимальной предпочтительности
+    const maxPref = paretoSolutions[paretoSolutions.length - 1];
+    recommendations.push({
+        scenario: 'Максимизация предпочтительности',
+        weights: maxPref.weights,
+        expectedCost: maxPref.totalCost,
+        expectedLoad: (maxPref.maxLoad * 100).toFixed(1) + '%',
+        expectedPreference: maxPref.totalPreference.toFixed(1)
+    });
+    
+    return recommendations;
+}
 
 // Статистика по задачам
 exports.getTaskStatistics = async (req, res) => {
