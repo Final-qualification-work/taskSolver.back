@@ -415,5 +415,23 @@ router.put('/:id', teamController.updateTeam);
  *         description: Внутренняя ошибка сервера
  */
 router.delete('/:id', teamController.deleteTeam);
-
+/**
+ * @swagger
+ * /api/teams/{id}/tasks:
+ *   get:
+ *     summary: Получить задачи команды
+ *     tags: [Teams]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [backlog, todo, in progress, done] }
+ *       - in: query
+ *         name: priority
+ *         schema: { type: integer, minimum: 1, maximum: 3 }
+ */
+router.get('/:id/tasks', teamController.getTeamTasks);
 module.exports = router;

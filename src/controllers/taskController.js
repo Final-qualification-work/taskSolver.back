@@ -1,13 +1,13 @@
 const { Task, Team } = require('../models/index');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const { Parser } = require('json2csv');
 
 // Создание задачи
 exports.createTask = async (req, res) => {
     try {
         const task = await Task.create(req.body);
         
-        // Загружаем связанную команду, если есть
         const taskWithTeam = await Task.findByPk(task.id, {
             include: [{
                 model: Team,
@@ -33,12 +33,10 @@ exports.getAllTasks = async (req, res) => {
     try {
         const { status, tag, page = 1, limit = 10 } = req.query;
         
-        // Построение условий фильтрации
         const where = {};
         if (status) where.status = status;
         if (tag) where.tag = tag;
         
-        // Пагинация
         const offset = (page - 1) * limit;
         
         const tasks = await Task.findAndCountAll({
@@ -110,7 +108,6 @@ exports.updateTask = async (req, res) => {
         
         await task.update(req.body);
         
-        // Загружаем обновленную задачу с командой
         const updatedTask = await Task.findByPk(task.id, {
             include: [{
                 model: Team,
@@ -157,12 +154,52 @@ exports.deleteTask = async (req, res) => {
     }
 };
 
-// Алгоритм распределения задач
-// @desc    Оптимизация распределения задач
-// @route   GET /api/tasks/optimize
-const optimizeAssignment = async (req, res) => {
+// Статистика по задачам
+exports.getTaskStatistics = async (req, res) => {
     try {
-        // Получаем все невыполненные задачи
+        const totalTasks = await Task.count();
+        const tasksByStatus = await Task.findAll({
+            attributes: [
+                'status',
+                [sequelize.fn('COUNT', sequelize.col('status')), 'count']
+            ],
+            group: ['status']
+        });
+        
+        const tasksByTag = await Task.findAll({
+            attributes: [
+                'tag',
+                [sequelize.fn('COUNT', sequelize.col('tag')), 'count']
+            ],
+            group: ['tag']
+        });
+        
+        const averageComplexity = await Task.findOne({
+            attributes: [
+                [sequelize.fn('AVG', sequelize.col('complexity')), 'avg_complexity']
+            ]
+        });
+        
+        res.status(200).json({
+            success: true,
+            data: {
+                total: totalTasks,
+                byStatus: tasksByStatus,
+                byTag: tasksByTag,
+                averageComplexity: averageComplexity?.dataValues.avg_complexity || 0
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Оптимизация распределения задач
+exports.optimizeAssignment = async (req, res) => {
+    try {
         const tasks = await Task.findAll({
             where: {
                 status: {
@@ -171,7 +208,6 @@ const optimizeAssignment = async (req, res) => {
             }
         });
 
-        // Получаем все команды
         const teams = await Team.findAll();
 
         if (teams.length === 0) {
@@ -188,29 +224,21 @@ const optimizeAssignment = async (req, res) => {
             });
         }
 
-        // Импортируем оптимизатор
         const SimplexOptimizer = require('../utils/simplexOptimizer');
-        
-        // Создаем экземпляр оптимизатора
         const optimizer = new SimplexOptimizer(tasks, teams);
-        
-        // Запускаем оптимизацию
         const solutions = await optimizer.optimize();
         
         if (solutions.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Не найдено допустимых решений (невозможно назначить все задачи)'
+                message: 'Не найдено допустимых решений'
             });
         }
         
-        // Сохраняем лучшее решение (компромиссное)
         const bestSolution = solutions[Math.floor(solutions.length / 2)];
         await optimizer.saveBestSolution(bestSolution);
         
-        // Форматируем результат
         const formattedResults = solutions.map((solution, idx) => {
-            // Таблица назначений в удобном формате
             const assignmentTable = {
                 teams: solution.assignmentTable.headers.teams,
                 tasks: solution.assignmentTable.headers.tasks,
@@ -265,7 +293,7 @@ const optimizeAssignment = async (req, res) => {
                 },
                 paretoFront: formattedResults
             },
-            message: 'Оптимизация выполнена успешно. Все задачи назначены, каждая команда получила минимум одну задачу.'
+            message: 'Оптимизация выполнена успешно'
         });
     } catch (error) {
         console.error('Ошибка при оптимизации:', error);
@@ -276,93 +304,111 @@ const optimizeAssignment = async (req, res) => {
     }
 };
 
-// Функция генерации рекомендаций
-function generateRecommendations(paretoSolutions) {
-    if (paretoSolutions.length === 0) return [];
+// Массовое обновление задач
+exports.bulkUpdateTasks = async (req, res) => {
+    const transaction = await sequelize.transaction();
     
-    const recommendations = [];
-    
-    // Рекомендация для минимальной стоимости
-    const minCost = paretoSolutions[0];
-    recommendations.push({
-        scenario: 'Минимизация стоимости',
-        weights: minCost.weights,
-        expectedCost: minCost.totalCost,
-        expectedLoad: (minCost.maxLoad * 100).toFixed(1) + '%',
-        expectedPreference: minCost.totalPreference.toFixed(1)
-    });
-    
-    // Рекомендация для сбалансированного решения
-    const balancedIndex = Math.floor(paretoSolutions.length / 2);
-    const balanced = paretoSolutions[balancedIndex];
-    recommendations.push({
-        scenario: 'Сбалансированное решение',
-        weights: balanced.weights,
-        expectedCost: balanced.totalCost,
-        expectedLoad: (balanced.maxLoad * 100).toFixed(1) + '%',
-        expectedPreference: balanced.totalPreference.toFixed(1)
-    });
-    
-    // Рекомендация для минимальной загрузки
-    const minLoad = paretoSolutions.reduce((min, s) => 
-        s.maxLoad < min.maxLoad ? s : min, paretoSolutions[0]);
-    recommendations.push({
-        scenario: 'Минимизация загрузки',
-        weights: minLoad.weights,
-        expectedCost: minLoad.totalCost,
-        expectedLoad: (minLoad.maxLoad * 100).toFixed(1) + '%',
-        expectedPreference: minLoad.totalPreference.toFixed(1)
-    });
-    
-    // Рекомендация для максимальной предпочтительности
-    const maxPref = paretoSolutions[paretoSolutions.length - 1];
-    recommendations.push({
-        scenario: 'Максимизация предпочтительности',
-        weights: maxPref.weights,
-        expectedCost: maxPref.totalCost,
-        expectedLoad: (maxPref.maxLoad * 100).toFixed(1) + '%',
-        expectedPreference: maxPref.totalPreference.toFixed(1)
-    });
-    
-    return recommendations;
-}
-
-// Статистика по задачам
-exports.getTaskStatistics = async (req, res) => {
     try {
-        const totalTasks = await Task.count();
-        const tasksByStatus = await Task.findAll({
-            attributes: [
-                'status',
-                [sequelize.fn('COUNT', sequelize.col('status')), 'count']
-            ],
-            group: ['status']
-        });
-        
-        const tasksByTag = await Task.findAll({
-            attributes: [
-                'tag',
-                [sequelize.fn('COUNT', sequelize.col('tag')), 'count']
-            ],
-            group: ['tag']
-        });
-        
-        const averageComplexity = await Task.findAll({
-            attributes: [
-                [sequelize.fn('AVG', sequelize.col('complexity')), 'avg_complexity']
-            ]
-        });
-        
+        const { updates } = req.body;
+
+        if (!updates || !Array.isArray(updates) || updates.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Необходимо предоставить массив updates'
+            });
+        }
+
+        const results = {
+            success: [],
+            failed: []
+        };
+
+        for (const update of updates) {
+            try {
+                const task = await Task.findByPk(update.taskId, { transaction });
+                
+                if (!task) {
+                    results.failed.push({ taskId: update.taskId, reason: 'Задача не найдена' });
+                    continue;
+                }
+
+                const allowedFields = ['status', 'assignedTeamId', 'business_priority'];
+                const updateData = {};
+                
+                for (const field of allowedFields) {
+                    if (update[field] !== undefined) {
+                        updateData[field] = update[field];
+                    }
+                }
+
+                await task.update(updateData, { transaction });
+                results.success.push({ taskId: update.taskId, updated: updateData });
+            } catch (err) {
+                results.failed.push({ taskId: update.taskId, reason: err.message });
+            }
+        }
+
+        await transaction.commit();
+
         res.status(200).json({
             success: true,
-            data: {
-                total: totalTasks,
-                byStatus: tasksByStatus,
-                byTag: tasksByTag,
-                averageComplexity: averageComplexity[0]?.dataValues.avg_complexity || 0
-            }
+            data: results,
+            message: `Обновлено ${results.success.length} из ${updates.length} задач`
         });
     } catch (error) {
+        await transaction.rollback();
+        console.error('Ошибка:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Экспорт задач в CSV
+exports.exportTasks = async (req, res) => {
+    try {
+        const { format = 'csv', status, tag } = req.query;
+        
+        const where = {};
+        if (status) where.status = status;
+        if (tag) where.tag = tag;
+
+        const tasks = await Task.findAll({
+            where,
+            include: [{ model: Team, as: 'assignedTeam', required: false }]
+        });
+
+        const exportData = tasks.map(task => ({
+            'ID': task.id,
+            'Название': task.name,
+            'Описание': task.description,
+            'Тег': task.tag,
+            'Сложность (поинты)': task.complexity,
+            'Приоритет (1-3)': task.business_priority,
+            'Статус': task.status,
+            'Дедлайн': task.deadline.toISOString().split('T')[0],
+            'Назначенная команда': task.assignedTeam?.name || 'Не назначена',
+            'Стоимость': task.assignedTeam ? task.complexity * task.assignedTeam.cost : 0
+        }));
+
+        if (format === 'json') {
+            return res.status(200).json({
+                success: true,
+                data: exportData,
+                count: exportData.length
+            });
+        }
+
+        const parser = new Parser({ withBOM: true });
+        const csv = parser.parse(exportData);
+        
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=tasks_export_${new Date().toISOString().split('T')[0]}.csv`);
+        res.status(200).send(csv);
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
         res.status(500).json({
             success: false,
             message: error.message

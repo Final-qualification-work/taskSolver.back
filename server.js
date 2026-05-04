@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const specs = require('./src/config/swagger');
+const authRoutes = require('./src/routes/authRoutes');
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -41,6 +42,7 @@ app.use((req, res, next) => {
 // Роуты
 app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
+app.use('/api/auth', authRoutes);
 
 // Базовый роут
 app.get('/', (req, res) => {

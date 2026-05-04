@@ -1,10 +1,12 @@
 const { sequelize } = require('../config/database');
 const TeamModel = require('./Team');
 const TaskModel = require('./Task');
+const UserModel = require('./User');
 
 // Инициализация моделей
 const Team = TeamModel(sequelize);
 const Task = TaskModel(sequelize);
+const User = UserModel(sequelize);
 
 // Определение связей между моделями
 Task.belongsTo(Team, {
@@ -19,6 +21,17 @@ Team.hasMany(Task, {
     as: 'tasks',
     onDelete: 'SET NULL',
     onUpdate: 'CASCADE'
+});
+
+User.belongsTo(Team, {
+    foreignKey: 'teamId',
+    as: 'team',
+    onDelete: 'SET NULL'
+});
+
+Team.hasMany(User, {
+    foreignKey: 'teamId',
+    as: 'users'
 });
 
 // Функция для синхронизации базы данных
@@ -150,5 +163,6 @@ module.exports = {
     sequelize,
     Team,
     Task,
+    User,
     syncDatabase
 };

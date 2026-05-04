@@ -193,3 +193,58 @@ exports.getTeamLoad = async (req, res) => {
         });
     }
 };
+
+// @desc    Получить задачи команды с фильтрацией
+// @route   GET /api/teams/:id/tasks
+const getTeamTasks = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, priority } = req.query;
+
+        const team = await Team.findByPk(id);
+        if (!team) {
+            return res.status(404).json({
+                success: false,
+                message: 'Команда не найдена'
+            });
+        }
+
+        const where = { assignedTeamId: id };
+        if (status) where.status = status;
+        if (priority) where.business_priority = priority;
+
+        const tasks = await Task.findAll({
+            where,
+            order: [
+                ['business_priority', 'DESC'],
+                ['deadline', 'ASC']
+            ]
+        });
+
+        // Статистика по задачам команды
+        const stats = {
+            total: tasks.length,
+            byStatus: {
+                backlog: tasks.filter(t => t.status === 'backlog').length,
+                todo: tasks.filter(t => t.status === 'todo').length,
+                in_progress: tasks.filter(t => t.status === 'in progress').length,
+                done: tasks.filter(t => t.status === 'done').length
+            },
+            totalComplexity: tasks.reduce((sum, t) => sum + t.complexity, 0),
+            avgPriority: (tasks.reduce((sum, t) => sum + t.business_priority, 0) / tasks.length || 0).toFixed(1)
+        };
+
+        res.status(200).json({
+            success: true,
+            data: { team: team.name, tasks, stats }
+        });
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+module.exports = { ...module.exports, getTeamTasks };

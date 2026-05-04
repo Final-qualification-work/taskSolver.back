@@ -156,7 +156,6 @@ const taskController = require('../controllers/taskController');
  *       500:
  *         description: Внутренняя ошибка сервера
  */
-router.post('/', taskController.createTask);
 
 /**
  * @swagger
@@ -291,7 +290,6 @@ router.post('/', taskController.createTask);
  *       500:
  *         description: Внутренняя ошибка сервера
  */
-router.get('/', taskController.getAllTasks);
 
 /**
  * @swagger
@@ -357,7 +355,6 @@ router.get('/', taskController.getAllTasks);
  *       500:
  *         description: Внутренняя ошибка сервера
  */
-router.get('/statistics', taskController.getTaskStatistics);
 
 /**
  * @swagger
@@ -437,7 +434,6 @@ router.get('/statistics', taskController.getTaskStatistics);
  *       500:
  *         description: Внутренняя ошибка сервера
  */
-router.get('/optimize', taskController.optimizeAssignment);
 
 /**
  * @swagger
@@ -476,7 +472,6 @@ router.get('/optimize', taskController.optimizeAssignment);
  *       500:
  *         description: Внутренняя ошибка сервера
  */
-router.get('/:id', taskController.getTaskById);
 
 /**
  * @swagger
@@ -563,7 +558,6 @@ router.get('/:id', taskController.getTaskById);
  *       500:
  *         description: Внутренняя ошибка сервера
  */
-router.put('/:id', taskController.updateTask);
 
 /**
  * @swagger
@@ -603,6 +597,31 @@ router.put('/:id', taskController.updateTask);
  *       500:
  *         description: Внутренняя ошибка сервера
  */
+
+/**
+ * @swagger
+ * /api/tasks/bulk-update:
+ *   post:
+ *     summary: Массовое обновление задач
+ *     tags: [Tasks]
+ */
+
+/**
+ * @swagger
+ * /api/tasks/export:
+ *   get:
+ *     summary: Экспорт задач в CSV
+ *     tags: [Tasks]
+ */
+
+router.post('/', taskController.createTask);
+router.get('/', taskController.getAllTasks);
+router.get('/statistics', taskController.getTaskStatistics);
+router.get('/optimize', taskController.optimizeAssignment);
+router.get('/:id', taskController.getTaskById);
+router.put('/:id', taskController.updateTask);
 router.delete('/:id', taskController.deleteTask);
+router.post('/bulk-update', taskController.bulkUpdateTasks);
+router.get('/export', taskController.exportTasks);
 
 module.exports = router;

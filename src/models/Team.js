@@ -48,28 +48,13 @@ module.exports = (sequelize) => {
         capacity: {
             type: DataTypes.INTEGER,
             allowNull: false,
-            validate: {
-                min: {
-                    args: [1],
-                    msg: 'Вместимость должна быть не менее 1'
-                }
-            },
-            comment: 'Максимальная вместимость в человеко-часах'
+            validate: { min: 1 },
+            comment: 'Вместимость команды в story points (поинтах)'
         },
         currentLoad: {
             type: DataTypes.INTEGER,
             defaultValue: 0,
-            validate: {
-                min: {
-                    args: [0],
-                    msg: 'Загрузка не может быть отрицательной'
-                },
-                max: {
-                    args: [9999],
-                    msg: 'Загрузка не может превышать 9999'
-                }
-            },
-            comment: 'Текущая загрузка в человеко-часах'
+            comment: 'Текущая загрузка в story points (поинтах)'
         }
     }, {
         tableName: 'teams',
