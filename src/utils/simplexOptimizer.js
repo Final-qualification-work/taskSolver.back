@@ -425,7 +425,11 @@ class SimplexOptimizer {
         
         return solutions;
     }
-
+    // Оптимизация с учетом пользовательских весов
+    optimizeWithWeights(userWeights) {
+        const { alpha, beta, gamma } = userWeights;
+        return this.optimizeAssignment({ alpha, beta, gamma });
+    }
     /**
      * Сохранение лучшего решения в БД
      */

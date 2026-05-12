@@ -6,6 +6,7 @@ const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const specs = require('./src/config/swagger');
 const authRoutes = require('./src/routes/authRoutes');
+const userRoutes = require('./src/routes/userRoutes');
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -17,6 +18,9 @@ const { syncDatabase } = require('./src/models/index');
 // Импорт роутов
 const taskRoutes = require('./src/routes/taskRoutes');
 const teamRoutes = require('./src/routes/teamRoutes');
+
+const visualizationRoutes = require('./src/routes/visualizationRoutes');
+const projectRoutes = require('./src/routes/projectRoutes');
 
 const app = express();
 
@@ -71,6 +75,10 @@ app.use((req, res) => {
         message: 'Маршрут не найден'
     });
 });
+
+app.use('/api/visualization', visualizationRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/users', userRoutes);
 
 // Запуск сервера
 const PORT = process.env.PORT || 3000;

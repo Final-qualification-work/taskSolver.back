@@ -100,6 +100,12 @@ module.exports = (sequelize) => {
             },
             field: 'assigned_team_id',
             comment: 'ID назначенной команды'
+        },
+        projectId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: { model: 'projects', key: 'id' },
+            field: 'project_id'
         }
     }, {
         tableName: 'tasks',

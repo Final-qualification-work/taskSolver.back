@@ -2,11 +2,15 @@ const { sequelize } = require('../config/database');
 const TeamModel = require('./Team');
 const TaskModel = require('./Task');
 const UserModel = require('./User');
+const ProjectModel = require('./Project');
+const UserPreferenceModel = require('./UserPreference');
 
 // Инициализация моделей
 const Team = TeamModel(sequelize);
 const Task = TaskModel(sequelize);
 const User = UserModel(sequelize);
+const Project = ProjectModel(sequelize);
+const UserPreference = UserPreferenceModel(sequelize);
 
 // Определение связей между моделями
 Task.belongsTo(Team, {
@@ -33,6 +37,35 @@ Team.hasMany(User, {
     foreignKey: 'teamId',
     as: 'users'
 });
+
+Project.belongsTo(User, { 
+    foreignKey: 'createdBy',
+    as: 'creator'
+});
+User.hasMany(Project, {
+    foreignKey: 'createdBy',
+    as: 'projects'
+});
+
+Task.belongsTo(Project, {
+    foreignKey: 'projectId',
+    as: 'project'
+});
+Project.hasMany(Task, {
+    foreignKey: 'projectId',
+    as: 'tasks'
+});
+
+// Связи с предпочтениями
+UserPreference.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+User.hasOne(UserPreference, {
+    foreignKey: 'userId',
+    as: 'preferences'
+});
+
 
 // Функция для синхронизации базы данных
 const syncDatabase = async (force = false) => {
@@ -164,5 +197,7 @@ module.exports = {
     Team,
     Task,
     User,
+    Project,
+    UserPreference,
     syncDatabase
 };
