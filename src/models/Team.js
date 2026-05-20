@@ -43,7 +43,7 @@ module.exports = (sequelize) => {
                     msg: 'Стоимость не может быть отрицательной'
                 }
             },
-            comment: 'Стоимость часа работы команды'
+            comment: 'Стоимость одного story point команды'
         },
         capacity: {
             type: DataTypes.INTEGER,

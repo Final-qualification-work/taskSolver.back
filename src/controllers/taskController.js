@@ -235,9 +235,6 @@ exports.optimizeAssignment = async (req, res) => {
             });
         }
         
-        const bestSolution = solutions[Math.floor(solutions.length / 2)];
-        await optimizer.saveBestSolution(bestSolution);
-        
         const formattedResults = solutions.map((solution, idx) => {
             const assignmentTable = {
                 teams: solution.assignmentTable.headers.teams,
@@ -288,18 +285,75 @@ exports.optimizeAssignment = async (req, res) => {
                 summary: {
                     totalTeams: teams.length,
                     totalTasks: tasks.length,
-                    solutionsCount: solutions.length,
-                    bestSolution: formattedResults[Math.floor(formattedResults.length / 2)]
+                    solutionsCount: solutions.length
                 },
                 paretoFront: formattedResults
             },
-            message: 'Оптимизация выполнена успешно'
+            message: 'Оптимизация выполнена успешно. Выберите одно из решений для применения'
         });
     } catch (error) {
         console.error('Ошибка при оптимизации:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Ошибка при выполнении оптимизации'
+        });
+    }
+};
+
+// Применение выбранного решения оптимизации
+exports.applyOptimizationSolution = async (req, res) => {
+    try {
+        const { point } = req.body;
+        if (!point || typeof point !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'Необходимо передать point (A-F)'
+            });
+        }
+
+        const tasks = await Task.findAll({
+            where: {
+                status: {
+                    [Op.ne]: 'done'
+                }
+            }
+        });
+        const teams = await Team.findAll();
+
+        if (teams.length === 0 || tasks.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Недостаточно данных для применения решения'
+            });
+        }
+
+        const SimplexOptimizer = require('../utils/simplexOptimizer');
+        const optimizer = new SimplexOptimizer(tasks, teams);
+        const solutions = await optimizer.optimize();
+        const selected = solutions.find((_, idx) => String.fromCharCode(65 + idx) === point.toUpperCase());
+
+        if (!selected) {
+            return res.status(404).json({
+                success: false,
+                message: `Решение ${point} не найдено`
+            });
+        }
+
+        await optimizer.saveBestSolution(selected);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                point: point.toUpperCase(),
+                name: selected.name
+            },
+            message: `Решение ${point.toUpperCase()} успешно применено`
+        });
+    } catch (error) {
+        console.error('Ошибка применения решения:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Ошибка при применении решения'
         });
     }
 };

@@ -618,10 +618,11 @@ router.post('/', taskController.createTask);
 router.get('/', taskController.getAllTasks);
 router.get('/statistics', taskController.getTaskStatistics);
 router.get('/optimize', taskController.optimizeAssignment);
+router.post('/optimize/apply', taskController.applyOptimizationSolution);
+router.post('/bulk-update', taskController.bulkUpdateTasks);
+router.get('/export', taskController.exportTasks);
 router.get('/:id', taskController.getTaskById);
 router.put('/:id', taskController.updateTask);
 router.delete('/:id', taskController.deleteTask);
-router.post('/bulk-update', taskController.bulkUpdateTasks);
-router.get('/export', taskController.exportTasks);
 
 module.exports = router;

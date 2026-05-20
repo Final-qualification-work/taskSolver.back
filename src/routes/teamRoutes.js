@@ -29,11 +29,11 @@ const teamController = require('../controllers/teamController');
  *           example: "frontend"
  *         cost:
  *           type: number
- *           description: Стоимость часа работы
+ *           description: Стоимость одного story point
  *           example: 2000
  *         capacity:
  *           type: integer
- *           description: Максимальная вместимость в человеко-часах
+ *           description: Максимальная вместимость в story points
  *           example: 40
  *         currentLoad:
  *           type: integer
@@ -88,7 +88,7 @@ const teamController = require('../controllers/teamController');
  *                 example: "frontend"
  *               cost:
  *                 type: number
- *                 description: Стоимость часа работы
+ *                 description: Стоимость одного story point
  *                 example: 2000
  *               capacity:
  *                 type: integer
@@ -347,7 +347,7 @@ router.get('/:id', teamController.getTeamById);
  *                 example: "frontend"
  *               cost:
  *                 type: number
- *                 description: Новая стоимость часа
+ *                 description: Новая стоимость одного story point
  *                 example: 2500
  *               capacity:
  *                 type: integer

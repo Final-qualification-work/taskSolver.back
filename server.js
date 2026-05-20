@@ -47,6 +47,9 @@ app.use((req, res, next) => {
 app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/visualization', visualizationRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/users', userRoutes);
 
 // Базовый роут
 app.get('/', (req, res) => {
@@ -55,6 +58,14 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         database: 'SQLite',
         documentation: '/api-docs'
+    });
+});
+
+// Обработка 404 (после всех маршрутов)
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Маршрут не найден'
     });
 });
 
@@ -67,18 +78,6 @@ app.use((err, req, res, next) => {
         error: process.env.NODE_ENV === 'development' ? err.message : {}
     });
 });
-
-// Обработка 404
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'Маршрут не найден'
-    });
-});
-
-app.use('/api/visualization', visualizationRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/users', userRoutes);
 
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
