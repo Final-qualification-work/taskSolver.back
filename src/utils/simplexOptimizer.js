@@ -352,12 +352,10 @@ class SimplexOptimizer {
         const solutions = [];
         
         const weightCombinations = [
-            { alpha: 0.8, beta: 0.1, gamma: 0.1, name: 'Минимизация стоимости' },
-            { alpha: 0.6, beta: 0.3, gamma: 0.1, name: 'Умеренная экономия' },
-            { alpha: 0.4, beta: 0.4, gamma: 0.2, name: 'Компромиссное решение' },
-            { alpha: 0.3, beta: 0.6, gamma: 0.1, name: 'Акцент на разгрузке' },
-            { alpha: 0.1, beta: 0.7, gamma: 0.2, name: 'Акцент на качестве' },
-            { alpha: 0.1, beta: 0.2, gamma: 0.7, name: 'Максимум предпочтительности' }
+            { alpha: 0.8,  beta: 0.1,  gamma: 0.1,  name: 'Минимизация стоимости', point: 'A' },
+            { alpha: 0.33, beta: 0.33, gamma: 0.34, name: 'Равный баланс', point: 'C' },
+            { alpha: 0.3,  beta: 0.6,  gamma: 0.1,  name: 'Акцент на разгрузке', point: 'D' },
+            { alpha: 0.1,  beta: 0.2,  gamma: 0.7,  name: 'Максимум предпочтительности', point: 'F' }
         ];
 
         for (const weights of weightCombinations) {
@@ -380,6 +378,7 @@ class SimplexOptimizer {
             
             if (!hasTagErrors) {
                 solutions.push({
+                    point: weights.point,
                     weights,
                     name: weights.name,
                     ...metrics,

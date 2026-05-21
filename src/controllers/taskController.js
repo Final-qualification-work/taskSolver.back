@@ -247,7 +247,7 @@ exports.optimizeAssignment = async (req, res) => {
             };
             
             return {
-                point: String.fromCharCode(65 + idx),
+                point: solution.point || String.fromCharCode(65 + idx),
                 name: solution.name,
                 weights: {
                     alpha: solution.weights.alpha,
@@ -330,7 +330,9 @@ exports.applyOptimizationSolution = async (req, res) => {
         const SimplexOptimizer = require('../utils/simplexOptimizer');
         const optimizer = new SimplexOptimizer(tasks, teams);
         const solutions = await optimizer.optimize();
-        const selected = solutions.find((_, idx) => String.fromCharCode(65 + idx) === point.toUpperCase());
+        const selected = solutions.find(
+            (s) => (s.point || '').toUpperCase() === point.toUpperCase()
+        );
 
         if (!selected) {
             return res.status(404).json({
