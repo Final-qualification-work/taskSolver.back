@@ -7,7 +7,7 @@ const options = {
             title: 'Task Management API',
             version: '2.0.0',
             description: `API для управления проектами, задачами и командами с многокритериальной оптимизацией.
-            
+
 **Возможности:**
 - Управление проектами и задачами
 - Многокритериальная оптимизация распределения (стоимость, загрузка, предпочтения)
@@ -98,8 +98,8 @@ const options = {
                         id: { type: 'integer', description: 'ID пользователя' },
                         username: { type: 'string', description: 'Имя пользователя' },
                         email: { type: 'string', format: 'email', description: 'Email' },
-                        role: { 
-                            type: 'string', 
+                        role: {
+                            type: 'string',
                             enum: ['admin', 'project_manager', 'team_lead', 'developer', 'viewer'],
                             description: 'Роль пользователя'
                         },

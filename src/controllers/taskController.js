@@ -2,19 +2,20 @@ const { Task, Team } = require('../models/index');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 const { Parser } = require('json2csv');
+const { clampBusinessPriority, withClampedBusinessPriority } = require('../utils/businessPriority');
+const Optimizer = require('../utils/optimizer');
 
-// Создание задачи
 exports.createTask = async (req, res) => {
     try {
-        const task = await Task.create(req.body);
-        
+        const task = await Task.create(withClampedBusinessPriority(req.body));
+
         const taskWithTeam = await Task.findByPk(task.id, {
             include: [{
                 model: Team,
                 as: 'assignedTeam'
             }]
         });
-        
+
         res.status(201).json({
             success: true,
             data: taskWithTeam,
@@ -28,28 +29,49 @@ exports.createTask = async (req, res) => {
     }
 };
 
-// Получение всех задач с фильтрацией
 exports.getAllTasks = async (req, res) => {
     try {
-        const { status, tag, page = 1, limit = 10 } = req.query;
-        
+        const {
+            status,
+            tag,
+            page = 1,
+            limit = 10,
+            assignedTeamId,
+            projectId,
+            priority_min,
+            priority_max,
+            sort_by = 'business_priority',
+            sort_order = 'DESC',
+        } = req.query;
+
         const where = {};
         if (status) where.status = status;
         if (tag) where.tag = tag;
-        
+        if (assignedTeamId) where.assigned_team_id = assignedTeamId;
+        if (projectId) where.project_id = projectId;
+        if (priority_min || priority_max) {
+            where.business_priority = {};
+            if (priority_min) where.business_priority[Op.gte] = parseInt(priority_min, 10);
+            if (priority_max) where.business_priority[Op.lte] = parseInt(priority_max, 10);
+        }
+
+        const allowedSort = ['business_priority', 'complexity', 'deadline', 'name', 'createdAt', 'updatedAt'];
+        const sortField = allowedSort.includes(sort_by) ? sort_by : 'business_priority';
+        const sortDir = String(sort_order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
         const offset = (page - 1) * limit;
-        
+
         const tasks = await Task.findAndCountAll({
             where,
             include: [{
                 model: Team,
                 as: 'assignedTeam'
             }],
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['business_priority', 'DESC'], ['createdAt', 'DESC']]
+            limit: parseInt(limit, 10),
+            offset: parseInt(offset, 10),
+            order: [[sortField, sortDir]]
         });
-        
+
         res.status(200).json({
             success: true,
             count: tasks.count,
@@ -65,7 +87,6 @@ exports.getAllTasks = async (req, res) => {
     }
 };
 
-// Получение задачи по ID
 exports.getTaskById = async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id, {
@@ -74,14 +95,14 @@ exports.getTaskById = async (req, res) => {
                 as: 'assignedTeam'
             }]
         });
-        
+
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Задача не найдена'
             });
         }
-        
+
         res.status(200).json({
             success: true,
             data: task
@@ -94,27 +115,26 @@ exports.getTaskById = async (req, res) => {
     }
 };
 
-// Обновление задачи
 exports.updateTask = async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
-        
+
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Задача не найдена'
             });
         }
-        
-        await task.update(req.body);
-        
+
+        await task.update(withClampedBusinessPriority(req.body));
+
         const updatedTask = await Task.findByPk(task.id, {
             include: [{
                 model: Team,
                 as: 'assignedTeam'
             }]
         });
-        
+
         res.status(200).json({
             success: true,
             data: updatedTask,
@@ -128,20 +148,19 @@ exports.updateTask = async (req, res) => {
     }
 };
 
-// Удаление задачи
 exports.deleteTask = async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
-        
+
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Задача не найдена'
             });
         }
-        
+
         await task.destroy();
-        
+
         res.status(200).json({
             success: true,
             message: 'Задача успешно удалена'
@@ -154,7 +173,6 @@ exports.deleteTask = async (req, res) => {
     }
 };
 
-// Статистика по задачам
 exports.getTaskStatistics = async (req, res) => {
     try {
         const totalTasks = await Task.count();
@@ -165,7 +183,7 @@ exports.getTaskStatistics = async (req, res) => {
             ],
             group: ['status']
         });
-        
+
         const tasksByTag = await Task.findAll({
             attributes: [
                 'tag',
@@ -173,13 +191,13 @@ exports.getTaskStatistics = async (req, res) => {
             ],
             group: ['tag']
         });
-        
+
         const averageComplexity = await Task.findOne({
             attributes: [
                 [sequelize.fn('AVG', sequelize.col('complexity')), 'avg_complexity']
             ]
         });
-        
+
         res.status(200).json({
             success: true,
             data: {
@@ -197,7 +215,6 @@ exports.getTaskStatistics = async (req, res) => {
     }
 };
 
-// Оптимизация распределения задач
 exports.optimizeAssignment = async (req, res) => {
     try {
         const tasks = await Task.findAll({
@@ -224,17 +241,16 @@ exports.optimizeAssignment = async (req, res) => {
             });
         }
 
-        const SimplexOptimizer = require('../utils/simplexOptimizer');
-        const optimizer = new SimplexOptimizer(tasks, teams);
+        const optimizer = new Optimizer(tasks, teams);
         const solutions = await optimizer.optimize();
-        
+
         if (solutions.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Не найдено допустимых решений'
             });
         }
-        
+
         const formattedResults = solutions.map((solution, idx) => {
             const assignmentTable = {
                 teams: solution.assignmentTable.headers.teams,
@@ -245,7 +261,7 @@ exports.optimizeAssignment = async (req, res) => {
                     assignedTasks: row.assignments.filter(a => a.assigned).map(a => a.taskName)
                 }))
             };
-            
+
             return {
                 point: solution.point || String.fromCharCode(65 + idx),
                 name: solution.name,
@@ -300,7 +316,6 @@ exports.optimizeAssignment = async (req, res) => {
     }
 };
 
-// Применение выбранного решения оптимизации
 exports.applyOptimizationSolution = async (req, res) => {
     try {
         const { point } = req.body;
@@ -327,8 +342,7 @@ exports.applyOptimizationSolution = async (req, res) => {
             });
         }
 
-        const SimplexOptimizer = require('../utils/simplexOptimizer');
-        const optimizer = new SimplexOptimizer(tasks, teams);
+        const optimizer = new Optimizer(tasks, teams);
         const solutions = await optimizer.optimize();
         const selected = solutions.find(
             (s) => (s.point || '').toUpperCase() === point.toUpperCase()
@@ -360,10 +374,9 @@ exports.applyOptimizationSolution = async (req, res) => {
     }
 };
 
-// Массовое обновление задач
 exports.bulkUpdateTasks = async (req, res) => {
     const transaction = await sequelize.transaction();
-    
+
     try {
         const { updates } = req.body;
 
@@ -382,7 +395,7 @@ exports.bulkUpdateTasks = async (req, res) => {
         for (const update of updates) {
             try {
                 const task = await Task.findByPk(update.taskId, { transaction });
-                
+
                 if (!task) {
                     results.failed.push({ taskId: update.taskId, reason: 'Задача не найдена' });
                     continue;
@@ -390,10 +403,12 @@ exports.bulkUpdateTasks = async (req, res) => {
 
                 const allowedFields = ['status', 'assignedTeamId', 'business_priority'];
                 const updateData = {};
-                
+
                 for (const field of allowedFields) {
                     if (update[field] !== undefined) {
-                        updateData[field] = update[field];
+                        updateData[field] = field === 'business_priority'
+                            ? clampBusinessPriority(update[field])
+                            : update[field];
                     }
                 }
 
@@ -421,11 +436,10 @@ exports.bulkUpdateTasks = async (req, res) => {
     }
 };
 
-// Экспорт задач в CSV
 exports.exportTasks = async (req, res) => {
     try {
         const { format = 'csv', status, tag } = req.query;
-        
+
         const where = {};
         if (status) where.status = status;
         if (tag) where.tag = tag;
@@ -458,11 +472,11 @@ exports.exportTasks = async (req, res) => {
 
         const parser = new Parser({ withBOM: true });
         const csv = parser.parse(exportData);
-        
+
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=tasks_export_${new Date().toISOString().split('T')[0]}.csv`);
         res.status(200).send(csv);
-        
+
     } catch (error) {
         console.error('Ошибка:', error);
         res.status(500).json({

@@ -6,14 +6,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const authenticate = async (req, res, next) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
-        
+
         if (!token) {
             return res.status(401).json({ success: false, message: 'Требуется авторизация' });
         }
 
         const decoded = jwt.verify(token, JWT_SECRET);
         const user = await User.findByPk(decoded.id);
-        
+
         if (!user || !user.isActive) {
             return res.status(401).json({ success: false, message: 'Пользователь не найден или заблокирован' });
         }
@@ -34,4 +34,14 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { authenticate, authorize };
+const denyViewer = (req, res, next) => {
+    if (req.user.role === 'viewer') {
+        return res.status(403).json({
+            success: false,
+            message: 'Роль «Наблюдатель»: доступ только для просмотра',
+        });
+    }
+    next();
+};
+
+module.exports = { authenticate, authorize, denyViewer };

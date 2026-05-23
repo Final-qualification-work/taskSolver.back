@@ -8,7 +8,7 @@ module.exports = (sequelize) => {
         email: { type: DataTypes.STRING(100), allowNull: false, unique: true, validate: { isEmail: true } },
         password: { type: DataTypes.STRING(255), allowNull: false },
         role: { type: DataTypes.ENUM('admin', 'project_manager', 'team_lead', 'developer', 'viewer'), defaultValue: 'developer' },
-        permissions: { type: DataTypes.JSON, defaultValue: { canCreateTasks: true, canEditTasks: true, canDeleteTasks: false, canAssignTeams: false, canManageUsers: false, canViewReports: true } },
+        permissions: { type: DataTypes.JSON, defaultValue: { canCreateTasks: true, canEditTasks: true, canDeleteTasks: false, canAssignTeams: false, canManageUsers: false, canViewReports: true, canOptimize: false } },
         teamId: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'teams', key: 'id' }, field: 'team_id' },
         isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' }
     }, {

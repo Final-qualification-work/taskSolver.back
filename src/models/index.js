@@ -5,14 +5,12 @@ const UserModel = require('./User');
 const ProjectModel = require('./Project');
 const UserPreferenceModel = require('./UserPreference');
 
-// Инициализация моделей
 const Team = TeamModel(sequelize);
 const Task = TaskModel(sequelize);
 const User = UserModel(sequelize);
 const Project = ProjectModel(sequelize);
 const UserPreference = UserPreferenceModel(sequelize);
 
-// Определение связей между моделями
 Task.belongsTo(Team, {
     foreignKey: 'assignedTeamId',
     as: 'assignedTeam',
@@ -38,7 +36,7 @@ Team.hasMany(User, {
     as: 'users'
 });
 
-Project.belongsTo(User, { 
+Project.belongsTo(User, {
     foreignKey: 'createdBy',
     as: 'creator'
 });
@@ -56,7 +54,6 @@ Project.hasMany(Task, {
     as: 'tasks'
 });
 
-// Связи с предпочтениями
 UserPreference.belongsTo(User, {
     foreignKey: 'userId',
     as: 'user'
@@ -66,18 +63,16 @@ User.hasOne(UserPreference, {
     as: 'preferences'
 });
 
-
-// Функция для синхронизации базы данных
 const syncDatabase = async (force = false) => {
     try {
-        // Синхронизируем модели с базой данных
-        await sequelize.sync({ 
-            force,  // Если true - удалит существующие таблицы и создаст заново
-            alter: false // Если true - попытается изменить существующие таблицы
+
+        await sequelize.sync({
+            force,
+            alter: false
         });
-        
+
         console.log('База данных синхронизирована');
-        
+
         if (force) {
             console.log('Добавляем тестовые данные...');
             await seedDatabase();
@@ -88,54 +83,52 @@ const syncDatabase = async (force = false) => {
     }
 };
 
-// Функция для добавления тестовых данных
 const seedDatabase = async () => {
     try {
-        // Создаем тестовые команды
+
         const teams = await Team.bulkCreate([
-            { 
-                name: 'Frontend Разработка', 
-                tag: 'frontend', 
-                cost: 2000, 
+            {
+                name: 'Frontend Разработка',
+                tag: 'frontend',
+                cost: 2000,
                 capacity: 40,
                 currentLoad: 0
             },
-            { 
-                name: 'ML Инженеры', 
-                tag: 'ML', 
-                cost: 3500, 
+            {
+                name: 'ML Инженеры',
+                tag: 'ML',
+                cost: 3500,
                 capacity: 30,
                 currentLoad: 0
             },
-            { 
-                name: 'Backend Разработка', 
-                tag: 'backend', 
-                cost: 2500, 
+            {
+                name: 'Backend Разработка',
+                tag: 'backend',
+                cost: 2500,
                 capacity: 35,
                 currentLoad: 0
             },
-            { 
-                name: 'Frontend Junior', 
-                tag: 'frontend', 
-                cost: 1500, 
+            {
+                name: 'Frontend Junior',
+                tag: 'frontend',
+                cost: 1500,
                 capacity: 25,
                 currentLoad: 0
             },
-            { 
-                name: 'ML Исследования', 
-                tag: 'ML', 
-                cost: 4000, 
+            {
+                name: 'ML Исследования',
+                tag: 'ML',
+                cost: 4000,
                 capacity: 20,
                 currentLoad: 0
             }
         ]);
-        
+
         console.log(`Создано ${teams.length} тестовых команд`);
 
-        // Создаем тестовые задачи
         const now = new Date();
         const nextMonth = new Date(now.setMonth(now.getMonth() + 1));
-        
+
         const tasks = await Task.bulkCreate([
             {
                 name: 'Разработать главную страницу',
@@ -143,7 +136,7 @@ const seedDatabase = async () => {
                 tag: 'frontend',
                 complexity: 5,
                 deadline: nextMonth,
-                business_priority: 8,
+                business_priority: 3,
                 status: 'backlog'
             },
             {
@@ -152,7 +145,7 @@ const seedDatabase = async () => {
                 tag: 'backend',
                 complexity: 4,
                 deadline: nextMonth,
-                business_priority: 9,
+                business_priority: 3,
                 status: 'todo'
             },
             {
@@ -161,7 +154,7 @@ const seedDatabase = async () => {
                 tag: 'ML',
                 complexity: 8,
                 deadline: nextMonth,
-                business_priority: 7,
+                business_priority: 2,
                 status: 'not groomed'
             },
             {
@@ -170,7 +163,7 @@ const seedDatabase = async () => {
                 tag: 'frontend',
                 complexity: 3,
                 deadline: nextMonth,
-                business_priority: 6,
+                business_priority: 2,
                 status: 'backlog'
             },
             {
@@ -179,13 +172,13 @@ const seedDatabase = async () => {
                 tag: 'backend',
                 complexity: 6,
                 deadline: nextMonth,
-                business_priority: 8,
+                business_priority: 3,
                 status: 'todo'
             }
         ]);
-        
+
         console.log(`Создано ${tasks.length} тестовых задач`);
-        
+
     } catch (error) {
         console.error('Ошибка добавления тестовых данных:', error);
         throw error;

@@ -1,11 +1,10 @@
 const { Team, Task } = require('../models/index');
 const { Op } = require('sequelize');
 
-// Создание команды
 exports.createTeam = async (req, res) => {
     try {
         const team = await Team.create(req.body);
-        
+
         res.status(201).json({
             success: true,
             data: team,
@@ -19,21 +18,19 @@ exports.createTeam = async (req, res) => {
     }
 };
 
-// Получение всех команд с фильтрацией
 exports.getAllTeams = async (req, res) => {
     try {
         const { tag, minLoad, maxLoad } = req.query;
-        
+
         const where = {};
         if (tag) where.tag = tag;
-        
-        // Фильтр по загрузке
+
         if (minLoad || maxLoad) {
             where.currentLoad = {};
             if (minLoad) where.currentLoad[Op.gte] = parseInt(minLoad);
             if (maxLoad) where.currentLoad[Op.lte] = parseInt(maxLoad);
         }
-        
+
         const teams = await Team.findAll({
             where,
             include: [{
@@ -43,8 +40,7 @@ exports.getAllTeams = async (req, res) => {
             }],
             order: [['name', 'ASC']]
         });
-        
-        // Добавляем процент загрузки
+
         const teamsWithStats = teams.map(team => {
             const teamData = team.toJSON();
             teamData.loadPercentage = (team.currentLoad / team.capacity) * 100;
@@ -52,7 +48,7 @@ exports.getAllTeams = async (req, res) => {
             teamData.tasksCount = team.tasks?.length || 0;
             return teamData;
         });
-        
+
         res.status(200).json({
             success: true,
             count: teamsWithStats.length,
@@ -66,7 +62,6 @@ exports.getAllTeams = async (req, res) => {
     }
 };
 
-// Получение команды по ID
 exports.getTeamById = async (req, res) => {
     try {
         const team = await Team.findByPk(req.params.id, {
@@ -75,18 +70,18 @@ exports.getTeamById = async (req, res) => {
                 as: 'tasks'
             }]
         });
-        
+
         if (!team) {
             return res.status(404).json({
                 success: false,
                 message: 'Команда не найдена'
             });
         }
-        
+
         const teamData = team.toJSON();
         teamData.loadPercentage = (team.currentLoad / team.capacity) * 100;
         teamData.availableCapacity = team.capacity - team.currentLoad;
-        
+
         res.status(200).json({
             success: true,
             data: teamData
@@ -99,20 +94,19 @@ exports.getTeamById = async (req, res) => {
     }
 };
 
-// Обновление команды
 exports.updateTeam = async (req, res) => {
     try {
         const team = await Team.findByPk(req.params.id);
-        
+
         if (!team) {
             return res.status(404).json({
                 success: false,
                 message: 'Команда не найдена'
             });
         }
-        
+
         await team.update(req.body);
-        
+
         res.status(200).json({
             success: true,
             data: team,
@@ -126,32 +120,30 @@ exports.updateTeam = async (req, res) => {
     }
 };
 
-// Удаление команды
 exports.deleteTeam = async (req, res) => {
     try {
         const team = await Team.findByPk(req.params.id);
-        
+
         if (!team) {
             return res.status(404).json({
                 success: false,
                 message: 'Команда не найдена'
             });
         }
-        
-        // Проверяем, есть ли назначенные задачи
+
         const assignedTasks = await Task.count({
             where: { assignedTeamId: team.id }
         });
-        
+
         if (assignedTasks > 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Нельзя удалить команду с назначенными задачами'
             });
         }
-        
+
         await team.destroy();
-        
+
         res.status(200).json({
             success: true,
             message: 'Команда успешно удалена'
@@ -164,14 +156,13 @@ exports.deleteTeam = async (req, res) => {
     }
 };
 
-// Получение загрузки всех команд
 exports.getTeamLoad = async (req, res) => {
     try {
         const teams = await Team.findAll({
             attributes: ['id', 'name', 'tag', 'capacity', 'currentLoad'],
             order: [['currentLoad', 'DESC']]
         });
-        
+
         const loadData = teams.map(team => ({
             id: team.id,
             name: team.name,
@@ -181,7 +172,7 @@ exports.getTeamLoad = async (req, res) => {
             available: team.capacity - team.currentLoad,
             loadPercentage: ((team.currentLoad / team.capacity) * 100).toFixed(2)
         }));
-        
+
         res.status(200).json({
             success: true,
             data: loadData
@@ -194,8 +185,6 @@ exports.getTeamLoad = async (req, res) => {
     }
 };
 
-// @desc    Получить задачи команды с фильтрацией
-// @route   GET /api/teams/:id/tasks
 const getTeamTasks = async (req, res) => {
     try {
         const { id } = req.params;
@@ -221,7 +210,6 @@ const getTeamTasks = async (req, res) => {
             ]
         });
 
-        // Статистика по задачам команды
         const stats = {
             total: tasks.length,
             byStatus: {

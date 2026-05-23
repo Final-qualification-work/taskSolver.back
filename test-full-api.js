@@ -29,15 +29,14 @@ const api = async (method, endpoint, data = null, token = null) => {
     }
 };
 
-// 1. Тест авторизации
 const testAuth = async () => {
     log.test('1. АВТОРИЗАЦИЯ');
-    
-    const result = await api('POST', '/auth/login', { 
-        email: 'admin@example.com', 
-        password: 'admin123' 
+
+    const result = await api('POST', '/auth/login', {
+        email: 'admin@example.com',
+        password: 'admin123'
     });
-    
+
     if (result.success) {
         authToken = result.data.token;
         log.success(`Вход выполнен: ${result.data.data.email} (${result.data.data.role})`);
@@ -48,10 +47,9 @@ const testAuth = async () => {
     }
 };
 
-// 2. Тест проектов
 const testProjects = async () => {
     log.test('\n2. ПРОЕКТЫ');
-    
+
     const projects = await api('GET', '/projects', null, authToken);
     if (projects.success) {
         log.success(`Получено проектов: ${projects.data.data.length}`);
@@ -63,10 +61,9 @@ const testProjects = async () => {
     }
 };
 
-// 3. Тест визуализации
 const testVisualization = async () => {
     log.test('\n3. ВИЗУАЛИЗАЦИЯ');
-    
+
     const dashboard = await api('GET', '/visualization/dashboard', null, authToken);
     if (dashboard.success) {
         log.success('Дашборд получен');
@@ -76,10 +73,9 @@ const testVisualization = async () => {
     }
 };
 
-// 4. Тест оптимизации
 const testOptimization = async () => {
     log.test('\n4. ОПТИМИЗАЦИЯ');
-    
+
     const optimize = await api('GET', '/tasks/optimize', null, authToken);
     if (optimize.success) {
         log.success('Оптимизация выполнена');
@@ -89,10 +85,9 @@ const testOptimization = async () => {
     }
 };
 
-// 5. Тест экспорта
 const testExport = async () => {
     log.test('\n5. ЭКСПОРТ');
-    
+
     const json = await api('GET', '/tasks/export?format=json', null, authToken);
     if (json.success) {
         log.success(`JSON экспорт: ${json.data.data.count} задач`);
@@ -101,27 +96,26 @@ const testExport = async () => {
     }
 };
 
-// Запуск всех тестов
 const runTests = async () => {
     console.log('\n' + '='.repeat(60));
     console.log('🧪 ТЕСТИРОВАНИЕ API');
     console.log('='.repeat(60));
-    
+
     try {
         await axios.get('http://localhost:3000');
     } catch {
         log.error('Сервер не запущен! Запустите: npm start');
         return;
     }
-    
+
     const authOk = await testAuth();
     if (!authOk) return;
-    
+
     await testProjects();
     await testVisualization();
     await testOptimization();
     await testExport();
-    
+
     console.log('\n' + '='.repeat(60));
     console.log('✨ ТЕСТИРОВАНИЕ ЗАВЕРШЕНО');
     console.log('='.repeat(60) + '\n');

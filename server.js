@@ -8,14 +8,11 @@ const specs = require('./src/config/swagger');
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 
-// Загрузка переменных окружения
 dotenv.config();
 
-// Подключение к базе данных
 const { testConnection } = require('./src/config/database');
 const { syncDatabase } = require('./src/models/index');
 
-// Импорт роутов
 const taskRoutes = require('./src/routes/taskRoutes');
 const teamRoutes = require('./src/routes/teamRoutes');
 
@@ -24,26 +21,22 @@ const projectRoutes = require('./src/routes/projectRoutes');
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Swagger документация
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
     explorer: true,
     customCss: '.swagger-ui .topbar { display: none }',
     customSiteTitle: 'Task Management API Documentation'
 }));
 
-// Логирование запросов
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
 });
 
-// Роуты
 app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/auth', authRoutes);
@@ -51,9 +44,8 @@ app.use('/api/visualization', visualizationRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/users', userRoutes);
 
-// Базовый роут
 app.get('/', (req, res) => {
-    res.json({ 
+    res.json({
         message: 'API системы управления задачами работает',
         version: '1.0.0',
         database: 'SQLite',
@@ -61,7 +53,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// Обработка 404 (после всех маршрутов)
 app.use((req, res) => {
     res.status(404).json({
         success: false,
@@ -69,7 +60,6 @@ app.use((req, res) => {
     });
 });
 
-// Обработка ошибок
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
@@ -79,14 +69,13 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Запуск сервера
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
     try {
         await testConnection();
         await syncDatabase(false);
-        
+
         app.listen(PORT, () => {
             console.log(`\nСервер запущен на порту ${PORT}`);
             console.log(`База данных SQLite: ${process.env.DB_STORAGE}`);
